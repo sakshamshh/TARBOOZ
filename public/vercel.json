@@ -1,0 +1,14 @@
+{
+  "version": 2,
+  "outputDirectory": "public",
+  "rewrites": [
+    { "source": "/api/ai/chat", "destination": "/api/ai/chat" },
+    { "source": "/api/ai/extract-memory", "destination": "/api/ai/extract-memory" },
+    { "source": "/api/ai/should-search", "destination": "/api/ai/should-search" },
+    { "source": "/api/weather", "destination": "/api/weather" },
+    { "source": "/api/search", "destination": "/api/search" },
+    { "source": "/api/health", "destination": "/api/health" },
+    { "source": "/api/memory", "destination": "/api/memory" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
