@@ -22,5 +22,9 @@
   {
     "name": "006b-voice-fix.js",
     "appliedAt": "2026-05-03T11:30:38.745Z"
+  },
+  {
+    "name": "008-vercel-serverless.js",
+    "appliedAt": "2026-05-03T11:33:11.002Z"
   }
 ]
