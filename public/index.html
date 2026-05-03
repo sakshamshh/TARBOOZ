@@ -4,6 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Tarbooz</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Tarbooz">
+<meta name="theme-color" content="#181714">
+<link rel="apple-touch-icon" href="/icon.svg">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -1026,6 +1032,15 @@ function exportData(){
 function clearLocalData(){if(confirm('Clear local tasks and notes?')){tasks=[];notes=[];saveTasks();saveNotes();renderTasks();renderNotes();}}
 
 refreshDashboard();
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .then(() => console.log('🍉 SW registered'))
+      .catch(err => console.log('SW error:', err));
+  });
+}
 </script>
 </body>
 </html>
