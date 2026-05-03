@@ -4,12 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Tarbooz</title>
-<link rel="manifest" href="/manifest.json">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Tarbooz">
-<meta name="theme-color" content="#181714">
-<link rel="apple-touch-icon" href="/icon.svg">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -215,17 +209,6 @@ select.input{cursor:pointer}
 .modal-sub{font-size:13px;color:var(--muted);margin-bottom:20px;line-height:1.6}
 .modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:16px}
 
-/* VOICE */
-.mic-btn.listening{background:var(--red-bg)!important;border-color:var(--red)!important;color:var(--red)!important;animation:micPulse 1s infinite}
-@keyframes micPulse{0%,100%{opacity:1}50%{opacity:.4}}
-.voice-wave{display:flex;align-items:center;gap:3px;padding:10px 14px;background:var(--text);border-radius:12px;border-bottom-left-radius:4px}
-.voice-wave span{width:3px;border-radius:3px;background:#fff;animation:wave 1s infinite ease-in-out}
-.voice-wave span:nth-child(1){height:8px;animation-delay:0s}
-.voice-wave span:nth-child(2){height:16px;animation-delay:.1s}
-.voice-wave span:nth-child(3){height:24px;animation-delay:.2s}
-.voice-wave span:nth-child(4){height:16px;animation-delay:.3s}
-.voice-wave span:nth-child(5){height:8px;animation-delay:.4s}
-@keyframes wave{0%,100%{transform:scaleY(1)}50%{transform:scaleY(1.8)}}
 @media(max-width:760px){
   .sidebar{width:56px;padding:10px 6px}
   .nav-btn span,.sidebar-label{display:none}
@@ -866,7 +849,7 @@ async function sendMessage(){
     // Fetch memory context
     let memCtx='';
     try{const mr=await fetch(API+'/api/memory/context');const md=await mr.json();memCtx=md.context||'';}catch{}
-    const systemPrompt=getSystemPrompt()+(memCtx?'\n\n'+memCtx:'')+(searchContext||'');
+    const systemPrompt=getSystemPrompt()+(memCtx?'\n\n'+memCtx:'');
     const r=await fetch(API+'/api/ai/chat',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
@@ -882,7 +865,7 @@ async function sendMessage(){
       speak(reply);
       autoExtractMemory(text, reply);
     }
-  }catch(e){removeTyping(tid);appendMsg('ai','Could not reach server. Is Tarbooz running?');}
+  }catch(e){removeTyping(tid);appendMsg('ai','Error: '+e.message);console.error('Chat error:',e);}
   document.getElementById('sendBtn').disabled=false;
 }
 function appendMsg(role,text){
@@ -916,15 +899,6 @@ async function saveMemoryFromChat(){
   try{await fetch(API+'/api/memory',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({content,tag:'chat'})});alert('Saved to memory!');}catch{}
 }
 
-// ── SEARCH BADGE ──
-function appendSearchBadge(query){
-  const msgs=document.getElementById('chatMessages');
-  const d=document.createElement('div');
-  d.style.cssText='font-size:11px;color:var(--blue);padding:2px 0 6px 38px;animation:fadeIn .3s ease';
-  d.textContent='🔍 Searched: '+query;
-  msgs.appendChild(d);
-}
-
 // ── AUTO MEMORY ──
 async function autoExtractMemory(userMsg, aiMsg) {
   try {
@@ -951,179 +925,32 @@ async function autoExtractMemory(userMsg, aiMsg) {
   } catch { /* fail silently */ }
 }
 
-// ── VOICE — 006-voice-applied ──
-let recognition=null,isListening=false,isSpeaking=false;
-
+// ── VOICE ──
+let recognition=null,isListening=false;
 function toggleVoice(){
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-  if(!SR){
-    alert('Voice input not supported in this browser.\nOn iPhone: use Safari.\nOn desktop: use Chrome or Edge.');
-    return;
-  }
-  if(isListening){window._stopListening&&window._stopListening();return;}
-  startListening();
-}
-
-// 006b-voice-fix-applied
-function startListening(){
-  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){alert('Voice not supported in this browser. Try Chrome.');return;}
+  if(isListening){recognition&&recognition.stop();return;}
   recognition=new SR();
   recognition.lang=settings.lang||'en-IN';
   recognition.interimResults=true;
-  recognition.continuous=false; // iOS doesn't support continuous=true, we restart manually
-
-  let finalTranscript='';
-  let restartTimeout=null;
-  let userStopped=false;
-
-  recognition.onstart=()=>{
-    isListening=true;
-    userStopped=false;
-    document.getElementById('micBtn').classList.add('active','listening');
-    document.getElementById('chatInput').placeholder='Listening… (tap mic to send)';
-    appendVoiceWave();
-  };
-
-  recognition.onresult=e=>{
-    let interim='';
-    for(let i=e.resultIndex;i<e.results.length;i++){
-      if(e.results[i].isFinal){
-        finalTranscript+=e.results[i][0].transcript+' ';
-      } else {
-        interim+=e.results[i][0].transcript;
-      }
-    }
-    document.getElementById('chatInput').value=(finalTranscript+interim).trim();
-    autoResize(document.getElementById('chatInput'));
-  };
-
-  recognition.onend=()=>{
-    // If user hasn't manually stopped, restart to keep listening
-    if(!userStopped && isListening){
-      restartTimeout=setTimeout(()=>{
-        try{ recognition.start(); }catch(e){}
-      }, 200);
-      return;
-    }
-    // User tapped mic to stop — send the message
-    isListening=false;
-    document.getElementById('micBtn').classList.remove('active','listening');
-    document.getElementById('chatInput').placeholder='Message Tarbooz…';
-    removeVoiceWave();
-    const text=finalTranscript.trim()||document.getElementById('chatInput').value.trim();
-    if(text){
-      document.getElementById('chatInput').value=text;
-      sendMessage();
-    }
-  };
-
-  recognition.onerror=e=>{
-    if(e.error==='no-speech'){
-      // Restart on silence — keep listening
-      if(!userStopped && isListening){
-        try{ recognition.start(); }catch(err){}
-      }
-      return;
-    }
-    if(e.error==='not-allowed'){
-      alert('Microphone access denied.\nOn iPhone: go to Settings → Safari → Microphone → Allow.');
-    }
-    isListening=false;
-    userStopped=true;
-    document.getElementById('micBtn').classList.remove('active','listening');
-    document.getElementById('chatInput').placeholder='Message Tarbooz…';
-    removeVoiceWave();
-  };
-
-  // Override toggleVoice stop to set userStopped flag
-  window._stopListening=()=>{
-    userStopped=true;
-    isListening=false;
-    clearTimeout(restartTimeout);
-    try{ recognition.stop(); }catch(e){}
-  };
-
-  try{ recognition.start(); }
-  catch(e){ console.warn('Recognition start error:',e.message); }
+  recognition.onstart=()=>{isListening=true;document.getElementById('micBtn').classList.add('active');document.getElementById('chatInput').placeholder='Listening…';};
+  recognition.onresult=e=>{document.getElementById('chatInput').value=Array.from(e.results).map(r=>r[0].transcript).join('');};
+  recognition.onend=()=>{isListening=false;document.getElementById('micBtn').classList.remove('active');document.getElementById('chatInput').placeholder='Message Tarbooz…';if(document.getElementById('chatInput').value.trim())sendMessage();};
+  recognition.onerror=e=>{isListening=false;document.getElementById('micBtn').classList.remove('active');if(e.error==='not-allowed')alert('Microphone access denied.');};
+  recognition.start();
 }
-
-function appendVoiceWave(){
-  removeVoiceWave();
-  const msgs=document.getElementById('chatMessages');
-  const d=document.createElement('div');
-  d.className='msg';d.id='voice-wave-indicator';
-  d.innerHTML='<div class="msg-avatar ai">T</div><div class="msg-content"><div class="voice-wave"><span></span><span></span><span></span><span></span><span></span></div><div class="msg-time" style="font-size:11px;color:var(--faint);margin-top:3px">Listening…</div></div>';
-  msgs.appendChild(d);
-  msgs.scrollTop=msgs.scrollHeight;
-}
-
-function removeVoiceWave(){
-  const el=document.getElementById('voice-wave-indicator');
-  if(el) el.remove();
-}
-
 function speak(text){
-  if(!settings.tts) return;
-  if(!window.speechSynthesis) return;
+  if(!settings.tts||!window.speechSynthesis)return;
   stopSpeaking();
-
-  const clean=text
-    .replace(/\*\*(.+?)\*\*/g,'$1')
-    .replace(/\*(.+?)\*/g,'$1')
-    .replace(/`(.+?)`/g,'$1')
-    .replace(/#{1,6}\s/g,'')
-    .replace(/\n/g,' ')
-    .trim();
-
-  if(!clean) return;
-
-  // iOS requires voices to be loaded first
-  const doSpeak=()=>{
-    const u=new SpeechSynthesisUtterance(clean);
-    u.rate=parseFloat(settings.rate||1);
-    u.pitch=1;
-    u.volume=1;
-
-    // Pick best available voice for language
-    const voices=window.speechSynthesis.getVoices();
-    const lang=settings.lang||'en-IN';
-    const match=voices.find(v=>v.lang===lang)||voices.find(v=>v.lang.startsWith(lang.split('-')[0]))||null;
-    if(match) u.voice=match;
-
-    u.onstart=()=>{
-      isSpeaking=true;
-      document.getElementById('stopBtn').style.display='flex';
-    };
-    u.onend=()=>{
-      isSpeaking=false;
-      document.getElementById('stopBtn').style.display='none';
-    };
-    u.onerror=()=>{
-      isSpeaking=false;
-      document.getElementById('stopBtn').style.display='none';
-    };
-    window.speechSynthesis.speak(u);
-  };
-
-  // Voices may not be loaded yet on iOS
-  if(window.speechSynthesis.getVoices().length){
-    doSpeak();
-  } else {
-    window.speechSynthesis.onvoiceschanged=()=>{
-      window.speechSynthesis.onvoiceschanged=null;
-      doSpeak();
-    };
-  }
+  const clean=text.replace(/\*\*(.+?)\*\*/g,'$1').replace(/\*(.+?)\*/g,'$1').replace(/`(.+?)`/g,'$1').replace(/\n/g,' ');
+  const u=new SpeechSynthesisUtterance(clean);
+  u.rate=parseFloat(settings.rate||1);u.lang=settings.lang||'en-IN';
+  u.onstart=()=>{document.getElementById('stopBtn').style.display='flex';};
+  u.onend=u.onerror=()=>{document.getElementById('stopBtn').style.display='none';};
+  window.speechSynthesis.speak(u);
 }
-
-function stopSpeaking(){
-  if(window.speechSynthesis){
-    window.speechSynthesis.cancel();
-  }
-  isSpeaking=false;
-  const btn=document.getElementById('stopBtn');
-  if(btn) btn.style.display='none';
-}
+function stopSpeaking(){window.speechSynthesis&&window.speechSynthesis.cancel();document.getElementById('stopBtn').style.display='none';}
 
 // ── POMODORO ──
 let pomoState={phase:'focus',running:false,seconds:25*60,sessions:0,interval:null};
@@ -1190,15 +1017,6 @@ function exportData(){
 function clearLocalData(){if(confirm('Clear local tasks and notes?')){tasks=[];notes=[];saveTasks();saveNotes();renderTasks();renderNotes();}}
 
 refreshDashboard();
-</script>
-<script>
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js')
-      .then(() => console.log('🍉 SW registered'))
-      .catch(err => console.log('SW error:', err));
-  });
-}
 </script>
 </body>
 </html>
