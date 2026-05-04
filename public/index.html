@@ -983,7 +983,7 @@ function refreshDashboard(){
 
 // UTILS
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-function fmt(t){return esc(t).replace(/**(.+?)**/g,'<strong>$1</strong>').replace(/*(.+?)*/g,'<em>$1</em>').replace(/`(.+?)`/g,'<code style="font-family:var(--font);background:rgba(0,255,65,0.1);padding:1px 5px;font-size:12px;color:var(--green)">$1</code>').replace(/\n/g,'<br>');}
+function fmt(t){return esc(t).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\*(.+?)\*/g,'<em>$1</em>').replace(/`(.+?)`/g,'<code style="font-family:var(--font);background:rgba(0,255,65,0.1);padding:1px 5px;font-size:12px;color:var(--green)">$1</code>').replace(/\n/g,'<br>');}
 function exportData(){const blob=new Blob([JSON.stringify({tasks,notes,exportedAt:new Date().toISOString()},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='tarbooz-export.json';a.click();}
 function clearLocalData(){if(confirm('// PURGE ALL LOCAL DATA?')){tasks=[];notes=[];saveTasks();saveNotes();renderTasks();renderNotes();}}
 
