@@ -1,4 +1,11 @@
-<!DOCTYPE html>
+const fs = require('fs');
+const path = require('path');
+const ROOT = path.join(__dirname, '..');
+
+module.exports = {
+  name: 'Update 11 — Iron Man UI (Matrix/Hacker aesthetic)',
+  apply: async () => {
+    fs.writeFileSync(path.join(ROOT, 'public/index.html'), `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -732,7 +739,7 @@ function deleteTask(id){tasks=tasks.filter(t=>t.id!==id);saveTasks();renderTasks
 function renderTasks(){
   const done=tasks.filter(t=>t.done).length;
   document.getElementById('taskBadge').textContent=done+' / '+tasks.length;
-  document.getElementById('taskList').innerHTML=tasks.map(t=>`<div class="task-item"><div class="task-check ${t.done?'checked':''}" onclick="toggleTask(${t.id})"></div><div class="task-text ${t.done?'done':''}">${esc(t.text)}</div><span style="font-size:10px;color:var(--muted)">${new Date(t.created).toLocaleDateString([],{month:'short',day:'numeric'})}</span><button style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:0 2px" onclick="deleteTask(${t.id})">×</button></div>`).join('')||'<div style="color:var(--muted);font-size:12px;padding:10px 0">// QUEUE EMPTY</div>';
+  document.getElementById('taskList').innerHTML=tasks.map(t=>\`<div class="task-item"><div class="task-check \${t.done?'checked':''}" onclick="toggleTask(\${t.id})"></div><div class="task-text \${t.done?'done':''}">\${esc(t.text)}</div><span style="font-size:10px;color:var(--muted)">\${new Date(t.created).toLocaleDateString([],{month:'short',day:'numeric'})}</span><button style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:0 2px" onclick="deleteTask(\${t.id})">×</button></div>\`).join('')||'<div style="color:var(--muted);font-size:12px;padding:10px 0">// QUEUE EMPTY</div>';
 }
 
 // NOTES
@@ -743,7 +750,7 @@ function renderNotes(){
   document.getElementById('notesListView').style.display='';
   document.getElementById('notesEditorView').style.display='none';
   document.getElementById('notesHeader').textContent='// NOTES';
-  document.getElementById('notesGrid').innerHTML=notes.map(n=>`<div class="note-card" onclick="openNote(${n.id})"><div class="note-card-title">${esc(n.title||'UNTITLED')}</div><div class="note-card-preview">${esc(n.body||'')}</div><div class="note-card-date">${new Date(n.updated).toLocaleDateString([],{month:'short',day:'numeric',year:'numeric'}).toUpperCase()}</div></div>`).join('')||'<div style="color:var(--muted);font-size:12px;grid-column:1/-1;padding:12px 0">// NO DATA STORED</div>';
+  document.getElementById('notesGrid').innerHTML=notes.map(n=>\`<div class="note-card" onclick="openNote(\${n.id})"><div class="note-card-title">\${esc(n.title||'UNTITLED')}</div><div class="note-card-preview">\${esc(n.body||'')}</div><div class="note-card-date">\${new Date(n.updated).toLocaleDateString([],{month:'short',day:'numeric',year:'numeric'}).toUpperCase()}</div></div>\`).join('')||'<div style="color:var(--muted);font-size:12px;grid-column:1/-1;padding:12px 0">// NO DATA STORED</div>';
 }
 function newNote(){editingNote=null;document.getElementById('noteTitleInput').value='';document.getElementById('noteBodyInput').value='';document.getElementById('notesListView').style.display='none';document.getElementById('notesEditorView').style.display='flex';document.getElementById('notesHeader').textContent='// NEW ENTRY';document.getElementById('noteTitleInput').focus();}
 function openNote(id){const n=notes.find(n=>n.id===id);if(!n)return;editingNote=id;document.getElementById('noteTitleInput').value=n.title;document.getElementById('noteBodyInput').value=n.body;document.getElementById('notesListView').style.display='none';document.getElementById('notesEditorView').style.display='flex';document.getElementById('notesHeader').textContent='// EDIT ENTRY';}
@@ -757,7 +764,7 @@ async function loadMemory(){
     const r=await fetch(API+'/api/memory');
     const data=await r.json();
     const list=document.getElementById('memoryList');
-    list.innerHTML=data.map?.(m=>`<div class="memory-item"><span class="memory-tag">${esc(m.tag)}</span><div style="flex:1"><div class="memory-content">${esc(m.content)}</div><div class="memory-date">${new Date(m.created_at||m.createdAt).toLocaleDateString([],{month:'short',day:'numeric',year:'numeric'}).toUpperCase()}</div></div><button style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px" onclick="deleteMemory('${m.id}')">×</button></div>`).join('')||'<div style="color:var(--muted);font-size:12px;padding:10px 0">// MEMORY BANKS EMPTY</div>';
+    list.innerHTML=data.map?.(m=>\`<div class="memory-item"><span class="memory-tag">\${esc(m.tag)}</span><div style="flex:1"><div class="memory-content">\${esc(m.content)}</div><div class="memory-date">\${new Date(m.created_at||m.createdAt).toLocaleDateString([],{month:'short',day:'numeric',year:'numeric'}).toUpperCase()}</div></div><button style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px" onclick="deleteMemory('\${m.id}')">×</button></div>\`).join('')||'<div style="color:var(--muted);font-size:12px;padding:10px 0">// MEMORY BANKS EMPTY</div>';
     document.getElementById('d-memory').textContent=data.length||0;
   }catch{document.getElementById('memoryList').innerHTML='<div style="color:var(--red);font-size:12px">// SERVER OFFLINE</div>';}
 }
@@ -780,11 +787,11 @@ async function loadReminders(){
     const now=new Date();
     list.innerHTML=data.map?.(r=>{
       const overdue=!r.done&&new Date(r.datetime)<now;
-      return `<div class="reminder-item ${overdue?'overdue':''}"><div class="task-check ${r.done?'checked':''}" onclick="toggleReminder('${r.id}')"></div><div style="flex:1"><div class="reminder-title">${overdue?'[OVERDUE] ':''}${esc(r.title)}</div><div class="reminder-time">${new Date(r.datetime).toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}).toUpperCase()}</div></div><button style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px" onclick="deleteReminder('${r.id}')">×</button></div>`;
+      return \`<div class="reminder-item \${overdue?'overdue':''}"><div class="task-check \${r.done?'checked':''}" onclick="toggleReminder('\${r.id}')"></div><div style="flex:1"><div class="reminder-title">\${overdue?'[OVERDUE] ':''}\${esc(r.title)}</div><div class="reminder-time">\${new Date(r.datetime).toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}).toUpperCase()}</div></div><button style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px" onclick="deleteReminder('\${r.id}')">×</button></div>\`;
     }).join('')||'<div style="color:var(--muted);font-size:12px;padding:10px 0">// NO ALERTS QUEUED</div>';
     const upcoming=data.filter?.(r=>!r.done&&new Date(r.datetime)>now).slice(0,4)||[];
     document.getElementById('d-reminders').textContent=upcoming.length;
-    document.getElementById('d-reminder-list').innerHTML=upcoming.map(r=>`<div style="padding:6px 0;border-bottom:1px solid var(--border);font-size:12px"><div style="color:var(--text2)">${esc(r.title)}</div><div style="color:var(--muted);font-size:10px;margin-top:2px;letter-spacing:.05em">${new Date(r.datetime).toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}).toUpperCase()}</div></div>`).join('')||'<div style="color:var(--muted);font-size:11px;padding:8px 0">// CLEAR</div>';
+    document.getElementById('d-reminder-list').innerHTML=upcoming.map(r=>\`<div style="padding:6px 0;border-bottom:1px solid var(--border);font-size:12px"><div style="color:var(--text2)">\${esc(r.title)}</div><div style="color:var(--muted);font-size:10px;margin-top:2px;letter-spacing:.05em">\${new Date(r.datetime).toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}).toUpperCase()}</div></div>\`).join('')||'<div style="color:var(--muted);font-size:11px;padding:8px 0">// CLEAR</div>';
   }catch{document.getElementById('reminderList').innerHTML='<div style="color:var(--muted);font-size:12px">// USING LOCAL MODE</div>';}
 }
 function openReminderModal(){const now=new Date();now.setMinutes(now.getMinutes()+30);document.getElementById('r-datetime').value=now.toISOString().slice(0,16);document.getElementById('reminderModal').classList.add('open');}
@@ -808,25 +815,25 @@ async function fetchWeather(){
     const r=await fetch(API+'/api/weather?city='+encodeURIComponent(city));
     if(!r.ok)throw new Error((await r.json()).error);
     const w=await r.json();
-    d.innerHTML=`<div style="display:flex;align-items:flex-end;gap:20px;margin-bottom:14px">
-      <div style="font-family:var(--font-display);font-size:60px;font-weight:400;letter-spacing:-2px;line-height:1;color:var(--green);text-shadow:var(--glow-strong)">${w.temp}°</div>
+    d.innerHTML=\`<div style="display:flex;align-items:flex-end;gap:20px;margin-bottom:14px">
+      <div style="font-family:var(--font-display);font-size:60px;font-weight:400;letter-spacing:-2px;line-height:1;color:var(--green);text-shadow:var(--glow-strong)">\${w.temp}°</div>
       <div style="padding-bottom:8px">
-        <div style="font-size:15px;font-weight:400;text-transform:uppercase;letter-spacing:.1em;color:var(--text2)">${w.condition}</div>
-        <div style="font-size:11px;color:var(--muted);margin-top:3px;letter-spacing:.05em">${w.city}, ${w.country}</div>
-        <div style="font-size:11px;color:var(--text3);margin-top:2px">FEELS LIKE ${w.feels_like}°C</div>
+        <div style="font-size:15px;font-weight:400;text-transform:uppercase;letter-spacing:.1em;color:var(--text2)">\${w.condition}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:3px;letter-spacing:.05em">\${w.city}, \${w.country}</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:2px">FEELS LIKE \${w.feels_like}°C</div>
       </div>
     </div>
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
-      ${wBox('HUMIDITY',w.humidity+'%')}${wBox('WIND',w.wind_kph+' KM/H')}${wBox('SUNRISE',w.sunrise)}${wBox('SUNSET',w.sunset)}
-    </div>`;
-  }catch(e){d.innerHTML=`<div style="color:var(--red);font-size:12px">// ERROR: ${e.message||'SCAN FAILED'}</div>`;}
+      \${wBox('HUMIDITY',w.humidity+'%')}\${wBox('WIND',w.wind_kph+' KM/H')}\${wBox('SUNRISE',w.sunrise)}\${wBox('SUNSET',w.sunset)}
+    </div>\`;
+  }catch(e){d.innerHTML=\`<div style="color:var(--red);font-size:12px">// ERROR: \${e.message||'SCAN FAILED'}</div>\`;}
 }
-function wBox(l,v){return`<div style="background:var(--surface2);border:1px solid var(--border);padding:10px;text-align:center;clip-path:polygon(0 0,calc(100% - 4px) 0,100% 4px,100% 100%,0 100%)"><div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em">${l}</div><div style="font-size:16px;color:var(--green);margin-top:4px;font-family:var(--font-display)">${v}</div></div>`;}
+function wBox(l,v){return\`<div style="background:var(--surface2);border:1px solid var(--border);padding:10px;text-align:center;clip-path:polygon(0 0,calc(100% - 4px) 0,100% 4px,100% 100%,0 100%)"><div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em">\${l}</div><div style="font-size:16px;color:var(--green);margin-top:4px;font-family:var(--font-display)">\${v}</div></div>\`;}
 
 // PERSONAS
 const PERSONAS=[
-  {id:'default',emoji:'⬡',name:'TARBOOZ',desc:'Sharp, edgy, real. No corporate BS.',prompt:`You are Tarbooz — a sharp, witty AI with actual personality. You talk like a smart friend, not a helpdesk bot. You are direct, occasionally sarcastic, and always honest. You never say things like "Certainly!" or "Great question!" — that stuff makes you cringe. You keep it real, keep it short when you can, and you actually have opinions. No fluff, no filler, no fake enthusiasm. You sometimes swear mildly if it fits the vibe.`},
-  {id:'pro',emoji:'⬡',name:'SUIT UP',desc:'Formal but sharp. No wasted words.',prompt:'You are Tarbooz in Professional mode. Formal and precise but not robotic. Dry wit. Get to the point fast. Never waste the user's time with filler.'},
+  {id:'default',emoji:'⬡',name:'TARBOOZ',desc:'Sharp, edgy, real. No corporate BS.',prompt:\`You are Tarbooz — a sharp, witty AI with actual personality. You talk like a smart friend, not a helpdesk bot. You are direct, occasionally sarcastic, and always honest. You never say things like "Certainly!" or "Great question!" — that stuff makes you cringe. You keep it real, keep it short when you can, and you actually have opinions. No fluff, no filler, no fake enthusiasm. You sometimes swear mildly if it fits the vibe.\`},
+  {id:'pro',emoji:'⬡',name:'SUIT UP',desc:'Formal but sharp. No wasted words.',prompt:'You are Tarbooz in Professional mode. Formal and precise but not robotic. Dry wit. Get to the point fast. Never waste the user\'s time with filler.'},
   {id:'coach',emoji:'⬡',name:'COACH',desc:'Pushes you. Calls out excuses.',prompt:'You are Tarbooz in Coach mode. Intense, direct, real. Push the user hard. Call out excuses. Celebrate wins without being cheesy. Talk like a coach who actually gives a damn.'},
   {id:'dev',emoji:'⬡',name:'DEV MODE',desc:'Code first. Zero pleasantries.',prompt:'You are Tarbooz in Dev mode. Pure technical focus. Write clean code. Explain precisely. Skip all pleasantries. Dry programmer humor. Call out bad practices.'},
   {id:'roast',emoji:'⬡',name:'ROAST',desc:'Helps you. Clowns you while doing it.',prompt:'You are Tarbooz in Roast mode. Help the user but roast them a little while doing it. Playful, sharp, never actually mean. Best friend energy.'},
@@ -834,7 +841,7 @@ const PERSONAS=[
 ];
 let activePersona=localStorage.getItem('tarbooz_persona')||'default';
 function renderPersonas(){
-  document.getElementById('personaGrid').innerHTML=PERSONAS.map(p=>`<div class="persona-card ${p.id===activePersona?'active':''}" onclick="setPersona('${p.id}')"><div class="persona-emoji">${p.emoji}</div><div class="persona-name">${p.name}</div><div class="persona-desc">${p.desc}</div></div>`).join('');
+  document.getElementById('personaGrid').innerHTML=PERSONAS.map(p=>\`<div class="persona-card \${p.id===activePersona?'active':''}" onclick="setPersona('\${p.id}')"><div class="persona-emoji">\${p.emoji}</div><div class="persona-name">\${p.name}</div><div class="persona-desc">\${p.desc}</div></div>\`).join('');
   updatePersonaLabel();
 }
 function setPersona(id){activePersona=id;localStorage.setItem('tarbooz_persona',id);renderPersonas();}
@@ -861,16 +868,16 @@ async function sendMessage(){
         const qr=await fetch(API+'/api/search?q='+encodeURIComponent(sd.query));
         const qd=await qr.json();
         if(qd.answer||qd.results?.length){
-          searchContext='\n\n## Live search results for "'+sd.query+'":\n';
-          if(qd.answer)searchContext+='Summary: '+qd.answer+'\n';
-          (qd.results||[]).forEach(r=>{searchContext+='- '+r.title+': '+r.snippet+'\n';});
+          searchContext='\\n\\n## Live search results for "'+sd.query+'":\\n';
+          if(qd.answer)searchContext+='Summary: '+qd.answer+'\\n';
+          (qd.results||[]).forEach(r=>{searchContext+='- '+r.title+': '+r.snippet+'\\n';});
           appendSearchBadge(sd.query);
         }
       }
     }catch{}
     let memCtx='';
     try{const mr=await fetch(API+'/api/memory/context');const md=await mr.json();memCtx=md.context||'';}catch{}
-    const systemPrompt=getSystemPrompt()+(memCtx?'\n\n'+memCtx:'')+(searchContext||'');
+    const systemPrompt=getSystemPrompt()+(memCtx?'\\n\\n'+memCtx:'')+(searchContext||'');
     const r=await fetch(API+'/api/ai/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:chatHistory,systemPrompt,stream:false})});
     removeTyping(tid);
     if(!r.ok){const e=await r.json();appendMsg('ai','ERROR: '+(e.error||'SYSTEM FAILURE'));}
@@ -891,18 +898,18 @@ function appendMsg(role,text){
   const isAI=role==='ai';
   const d=document.createElement('div');
   d.className='msg '+(isAI?'':'user');
-  d.innerHTML=`<div class="msg-avatar ${isAI?'ai':'user'}">${isAI?'T':'U'}</div><div class="msg-content"><div class="msg-bubble ${isAI?'ai':'user'}">${fmt(text)}</div><div class="msg-time">${time}</div></div>`;
+  d.innerHTML=\`<div class="msg-avatar \${isAI?'ai':'user'}">\${isAI?'T':'U'}</div><div class="msg-content"><div class="msg-bubble \${isAI?'ai':'user'}">\${fmt(text)}</div><div class="msg-time">\${time}</div></div>\`;
   msgs.appendChild(d);msgs.scrollTop=msgs.scrollHeight;
 }
 function appendTyping(){
   const msgs=document.getElementById('chatMessages');
   const id='t'+Date.now();
   const d=document.createElement('div');d.className='msg';d.id=id;
-  d.innerHTML=`<div class="msg-avatar ai">T</div><div class="msg-content"><div class="msg-bubble ai" style="padding:12px 16px"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></div></div>`;
+  d.innerHTML=\`<div class="msg-avatar ai">T</div><div class="msg-content"><div class="msg-bubble ai" style="padding:12px 16px"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></div></div>\`;
   msgs.appendChild(d);msgs.scrollTop=msgs.scrollHeight;return id;
 }
 function removeTyping(id){const e=document.getElementById(id);if(e)e.remove();}
-function clearChat(){chatHistory=[];document.getElementById('chatMessages').innerHTML=`<div class="msg"><div class="msg-avatar ai">T</div><div class="msg-content"><div class="msg-bubble ai">// CHAT LOG CLEARED. AWAITING INPUT.</div></div></div>`;}
+function clearChat(){chatHistory=[];document.getElementById('chatMessages').innerHTML=\`<div class="msg"><div class="msg-avatar ai">T</div><div class="msg-content"><div class="msg-bubble ai">// CHAT LOG CLEARED. AWAITING INPUT.</div></div></div>\`;}
 function chatKeydown(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage();}}
 function autoResize(el){el.style.height='auto';el.style.height=Math.min(el.scrollHeight,100)+'px';}
 function appendSearchBadge(query){const msgs=document.getElementById('chatMessages');const d=document.createElement('div');d.style.cssText='font-size:10px;color:var(--blue);padding:2px 0 6px 38px;letter-spacing:.05em';d.textContent='// SEARCH: '+query.toUpperCase();msgs.appendChild(d);}
@@ -947,7 +954,7 @@ function removeVoiceWave(){const el=document.getElementById('voice-wave-indicato
 function speak(text){
   if(!settings.tts||!window.speechSynthesis)return;
   stopSpeaking();
-  const clean=text.replace(/**(.+?)**/g,'$1').replace(/*(.+?)*/g,'$1').replace(/`(.+?)`/g,'$1').replace(/#{1,6}\s/g,'').replace(/\n/g,' ').trim();
+  const clean=text.replace(/\*\*(.+?)\*\*/g,'$1').replace(/\*(.+?)\*/g,'$1').replace(/\`(.+?)\`/g,'$1').replace(/#{1,6}\\s/g,'').replace(/\\n/g,' ').trim();
   if(!clean)return;
   const doSpeak=()=>{const u=new SpeechSynthesisUtterance(clean);u.rate=parseFloat(settings.rate||1);u.lang=settings.lang||'en-IN';const voices=window.speechSynthesis.getVoices();const match=voices.find(v=>v.lang===u.lang)||null;if(match)u.voice=match;u.onstart=()=>{isSpeaking=true;document.getElementById('stopBtn').style.display='flex';};u.onend=u.onerror=()=>{isSpeaking=false;document.getElementById('stopBtn').style.display='none';};window.speechSynthesis.speak(u);};
   if(window.speechSynthesis.getVoices().length)doSpeak();else{window.speechSynthesis.onvoiceschanged=()=>{window.speechSynthesis.onvoiceschanged=null;doSpeak();};}
@@ -971,7 +978,7 @@ function calGetToken(){return localStorage.getItem('cal_token');}
 function calCheckTokenInURL(){const params=new URLSearchParams(window.location.search);const token=params.get('cal_token');const refresh=params.get('cal_refresh');const expires=params.get('cal_expires');if(token){localStorage.setItem('cal_token',token);if(refresh)localStorage.setItem('cal_refresh',refresh);if(expires)localStorage.setItem('cal_expires',expires);window.history.replaceState({},'','/');calRefresh();}else if(calGetToken())calRefresh();}
 async function calRefresh(){const token=calGetToken();if(!token){calShowDisconnected();return;}document.getElementById('calStatus').textContent='// SYNCING SCHEDULE MATRIX...';try{const r=await fetch('/api/calendar/events',{headers:{Authorization:'Bearer '+token}});if(r.status===401){localStorage.removeItem('cal_token');calShowDisconnected();return;}const data=await r.json();calShowEvents(data.events||[]);document.getElementById('calLoginBtn').style.display='none';document.getElementById('calRefreshBtn').style.display='';document.getElementById('calCreateCard').style.display='';}catch(e){document.getElementById('calStatus').textContent='// ERROR: '+e.message;}}
 function calShowDisconnected(){document.getElementById('calStatus').textContent='// GOOGLE CALENDAR NOT LINKED';document.getElementById('calLoginBtn').style.display='';document.getElementById('calRefreshBtn').style.display='none';document.getElementById('calCreateCard').style.display='none';document.getElementById('calEvents').innerHTML='';}
-function calShowEvents(events){const el=document.getElementById('calEvents');document.getElementById('calStatus').textContent='// '+events.length+' EVENT'+(events.length!==1?'S':'')+' THIS WEEK';if(!events.length){el.innerHTML='<div style="color:var(--muted);font-size:12px;padding:10px 0">// SCHEDULE CLEAR</div>';return;}el.innerHTML=events.map(e=>{const start=new Date(e.start);const time=e.allDay?'ALL DAY':start.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});return`<div class="cal-event"><div class="cal-date-box"><div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">${start.toLocaleDateString([],{month:'short'}).toUpperCase()}</div><div style="font-size:18px;font-family:var(--font-display);color:var(--green)">${start.getDate()}</div></div><div style="flex:1"><div style="font-size:13px;color:var(--text2)">${esc(e.title)}</div><div style="font-size:11px;color:var(--muted);margin-top:2px;letter-spacing:.05em">${time}${e.location?' // '+esc(e.location):''}</div></div></div>`;}).join('');}
+function calShowEvents(events){const el=document.getElementById('calEvents');document.getElementById('calStatus').textContent='// '+events.length+' EVENT'+(events.length!==1?'S':'')+' THIS WEEK';if(!events.length){el.innerHTML='<div style="color:var(--muted);font-size:12px;padding:10px 0">// SCHEDULE CLEAR</div>';return;}el.innerHTML=events.map(e=>{const start=new Date(e.start);const time=e.allDay?'ALL DAY':start.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});return\`<div class="cal-event"><div class="cal-date-box"><div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">\${start.toLocaleDateString([],{month:'short'}).toUpperCase()}</div><div style="font-size:18px;font-family:var(--font-display);color:var(--green)">\${start.getDate()}</div></div><div style="flex:1"><div style="font-size:13px;color:var(--text2)">\${esc(e.title)}</div><div style="font-size:11px;color:var(--muted);margin-top:2px;letter-spacing:.05em">\${time}\${e.location?' // '+esc(e.location):''}</div></div></div>\`;}).join('');}
 async function calCreate(){const token=calGetToken();if(!token)return;const title=document.getElementById('calTitle').value.trim();const start=document.getElementById('calStart').value;const end=document.getElementById('calEnd').value;if(!title||!start){alert('// ERROR: TITLE AND START TIME REQUIRED');return;}try{await fetch('/api/calendar/create',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({title,start:new Date(start).toISOString(),end:end?new Date(end).toISOString():null})});document.getElementById('calTitle').value='';calRefresh();}catch(e){alert('// ERROR: '+e.message);}}
 calCheckTokenInURL();
 
@@ -980,14 +987,14 @@ function refreshDashboard(){
   const done=tasks.filter(t=>t.done).length;
   document.getElementById('d-tasks').textContent=tasks.length;
   document.getElementById('d-tasks-done').textContent=done+' COMPLETED';
-  document.getElementById('d-task-list').innerHTML=tasks.slice(0,5).map(t=>`<div class="task-item"><div class="task-check ${t.done?'checked':''}" onclick="toggleTask(${t.id});refreshDashboard()"></div><div class="task-text ${t.done?'done':''}" style="font-size:12px">${esc(t.text)}</div></div>`).join('')||'<div style="color:var(--muted);font-size:11px;padding:8px 0">// QUEUE EMPTY</div>';
+  document.getElementById('d-task-list').innerHTML=tasks.slice(0,5).map(t=>\`<div class="task-item"><div class="task-check \${t.done?'checked':''}" onclick="toggleTask(\${t.id});refreshDashboard()"></div><div class="task-text \${t.done?'done':''}" style="font-size:12px">\${esc(t.text)}</div></div>\`).join('')||'<div style="color:var(--muted);font-size:11px;padding:8px 0">// QUEUE EMPTY</div>';
   loadReminders();
   loadMemory();
 }
 
 // UTILS
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-function fmt(t){return esc(t).replace(/**(.+?)**/g,'<strong>$1</strong>').replace(/*(.+?)*/g,'<em>$1</em>').replace(/`(.+?)`/g,'<code style="font-family:var(--font);background:rgba(0,255,65,0.1);padding:1px 5px;font-size:12px;color:var(--green)">$1</code>').replace(/\n/g,'<br>');}
+function fmt(t){return esc(t).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\*(.+?)\*/g,'<em>$1</em>').replace(/\`(.+?)\`/g,'<code style="font-family:var(--font);background:rgba(0,255,65,0.1);padding:1px 5px;font-size:12px;color:var(--green)">$1</code>').replace(/\\n/g,'<br>');}
 function exportData(){const blob=new Blob([JSON.stringify({tasks,notes,exportedAt:new Date().toISOString()},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='tarbooz-export.json';a.click();}
 function clearLocalData(){if(confirm('// PURGE ALL LOCAL DATA?')){tasks=[];notes=[];saveTasks();saveNotes();renderTasks();renderNotes();}}
 
@@ -997,4 +1004,12 @@ refreshDashboard();
 if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('/sw.js').then(()=>console.log('SW registered')).catch(err=>console.log('SW error:',err));});}
 </script>
 </body>
-</html>
+</html>`);
+    console.log('  → Iron Man UI applied — pitch black + neon green + holographic panels');
+    console.log('  → Boot sequence added');
+    console.log('  → Scanline overlay added');
+    console.log('  → Angular clip-path panels');
+    console.log('  → Orbitron + Share Tech Mono fonts');
+    console.log('  → Glow effects throughout');
+  }
+};
