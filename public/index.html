@@ -1032,23 +1032,8 @@ async function sendToTelegram(btn, customText) {
   }
 }
 
-// Also intercept messages that say "send to telegram" or "push to telegram"
-const _origSend = sendMessage;
-async function sendMessage() {
-  const input = document.getElementById('chatInput');
-  const text = input.value.trim().toLowerCase();
-  if (text.includes('send to telegram') || text.includes('push to telegram') || text.includes('send this to telegram')) {
-    const bubbles = document.querySelectorAll('.msg-bubble.ai');
-    if (bubbles.length > 0) {
-      const lastMsg = bubbles[bubbles.length - 1].textContent;
-      await sendToTelegram(null, lastMsg);
-      appendMsg('ai', '// LAST RESPONSE PUSHED TO YOUR TELEGRAM.');
-      input.value = ''; input.style.height = 'auto';
-      return;
-    }
-  }
-  return _origSend();
-}
+
+
 // ── UTILS ──
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function fmt(t){return esc(t).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\*(.+?)\*/g,'<em>$1</em>').replace(/`(.+?)`/g,'<code style="font-family:var(--mono);background:rgba(255,255,255,.12);padding:1px 5px;border-radius:4px;font-size:13px">$1</code>').replace(/\n/g,'<br>');}
