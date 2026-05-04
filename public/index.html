@@ -877,7 +877,10 @@ function appendMsg(role,text){
   d.innerHTML=`<div class="msg-avatar ${isAI?'ai':'user'}">${isAI?'T':'U'}</div>
     <div class="msg-content">
       <div class="msg-bubble ${isAI?'ai':'user'}">${fmt(text)}</div>
-      <div class="msg-time">${time}</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div class="msg-time">${time}</div>
+        ${isAI?`<button onclick="sendToTelegram(this)" data-msg="${text.replace(/"/g,'&quot;')}" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:10px;letter-spacing:.05em;font-family:var(--font)" onmouseover="this.style.color='var(--green)'" onmouseout="this.style.color='var(--muted)'">// TG</button>`:''}
+      </div>
     </div>`;
   msgs.appendChild(d);msgs.scrollTop=msgs.scrollHeight;
 }
@@ -1009,7 +1012,7 @@ function refreshDashboard(){
 
 // ── SEND TO TELEGRAM ──
 async function sendToTelegram(btn, customText) {
-  const text = customText || btn?.getAttribute('data-text') || '';
+  const text = customText || btn?.getAttribute('data-msg') || '';
   if (!text) return;
   const original = btn ? btn.textContent : '';
   if (btn) { btn.textContent = '// SENDING...'; btn.style.color = 'var(--amber)'; }
