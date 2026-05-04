@@ -40,6 +40,14 @@ async function groq(messages, system, maxTokens = 1024, temp = 0.7) {
 // ── WMO Weather codes ──
 const WMO = {0:'Clear sky',1:'Mainly clear',2:'Partly cloudy',3:'Overcast',45:'Fog',51:'Light drizzle',61:'Light rain',63:'Rain',65:'Heavy rain',71:'Light snow',80:'Showers',95:'Thunderstorm'};
 
+async function sendTelegram(token, chatId, text) {
+  await axios.post(`https://api.telegram.org/bot${token}/sendMessage`, {
+    chat_id: chatId,
+    text,
+    parse_mode: 'Markdown'
+  });
+}
+
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,DELETE,OPTIONS,PATCH');
@@ -159,6 +167,136 @@ console.log('URL:', req.url, '→', url);
       const { title, start, end, description, location } = req.body;
       const r = await axios.post('https://www.googleapis.com/calendar/v3/calendars/primary/events', { summary: title, start: { dateTime: start }, end: { dateTime: end || start }, description, location }, { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } });
       return res.json({ event: r.data });
+    }
+
+    // ── Telegram Webhook ──
+    if (url === '/telegram/webhook') {
+      if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+      const { message } = req.body;
+      if (!message) return res.json({ ok: true });
+
+      const chatId = message.chat.id.toString();
+      const allowedChatId = process.env.TELEGRAM_CHAT_ID;
+      const botToken = process.env.TELEGRAM_BOT_TOKEN;
+
+      // Only respond to authorized user
+      if (chatId !== allowedChatId) {
+        await sendTelegram(botToken, chatId, '⛔ Unauthorized.');
+        return res.json({ ok: true });
+      }
+
+      const text = message.text || '';
+      const lower = text.toLowerCase().trim();
+
+      try {
+        // TASK: "task: buy groceries" or "todo: call mom"
+        if (lower.startsWith('task:') || lower.startsWith('todo:') || lower.startsWith('t:')) {
+          const content = text.split(':').slice(1).join(':').trim();
+          await sbInsert('tasks_tg', { id: require('crypto').randomUUID(), content, done: false, created_at: new Date().toISOString() }).catch(()=>{});
+          // Also call reminders API if available
+          const reply = await groq(
+            [{ role: 'user', content: `The user wants to add this task: "${content}". Confirm it's added in one short punchy sentence. Be Tarbooz — edgy, real, no fluff.` }],
+            'You are Tarbooz, a sharp AI assistant. Keep responses under 2 sentences.',
+            128, 0.8
+          );
+          await sendTelegram(botToken, chatId, '✅ TASK LOGGED\n' + reply);
+        }
+
+        // NOTE: "note: meeting was great"
+        else if (lower.startsWith('note:') || lower.startsWith('n:')) {
+          const content = text.split(':').slice(1).join(':').trim();
+          await sbInsert('notes_tg', { id: require('crypto').randomUUID(), title: content.slice(0,50), body: content, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }).catch(()=>{});
+          await sendTelegram(botToken, chatId, '📝 NOTE SAVED\n"' + content.slice(0,100) + '"');
+        }
+
+        // MEMORY: "remember: I prefer dark mode"
+        else if (lower.startsWith('remember:') || lower.startsWith('mem:') || lower.startsWith('log:')) {
+          const content = text.split(':').slice(1).join(':').trim();
+          await sbInsert('memories', { id: require('crypto').randomUUID(), content, tag: 'telegram', created_at: new Date().toISOString() });
+          await sendTelegram(botToken, chatId, '🧠 LOGGED TO MEMORY\n"' + content + '"');
+        }
+
+        // REMIND: "remind: dentist tomorrow at 3pm"
+        else if (lower.startsWith('remind:') || lower.startsWith('r:')) {
+          const content = text.split(':').slice(1).join(':').trim();
+          // Use AI to parse the time
+          const parsed = await groq(
+            [{ role: 'user', content: `Parse this reminder and extract title and datetime. Today is ${new Date().toISOString()}. Reminder: "${content}". Reply ONLY with JSON: {"title": "...", "datetime": "ISO string"}` }],
+            'You are a datetime parser. Reply only with valid JSON.',
+            128, 0.1
+          );
+          try {
+            const { title, datetime } = JSON.parse(parsed.trim());
+            await sbInsert('reminders_tg', { id: require('crypto').randomUUID(), title, datetime, notes: '', done: false, created_at: new Date().toISOString() }).catch(()=>{});
+            const dt = new Date(datetime).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+            await sendTelegram(botToken, chatId, '⏰ REMINDER SET\n' + title + ' @ ' + dt);
+          } catch {
+            await sendTelegram(botToken, chatId, '⏰ REMINDER LOGGED\n"' + content + '"');
+          }
+        }
+
+        // STATUS: "status" — show quick summary
+        else if (lower === 'status' || lower === 'sup' || lower === 'hey') {
+          const memories = await sbGet('memories').catch(()=>[]);
+          const reply = await groq(
+            [{ role: 'user', content: 'Give me a quick status update. What should I focus on?' }],
+            'You are Tarbooz. ' + (memories.length ? 'What you know about the user:\n' + memories.slice(0,5).map(m => '- ' + m.content).join('\n') : '') + '\nBe brief, edgy, useful. Max 3 sentences.',
+            256, 0.8
+          );
+          await sendTelegram(botToken, chatId, '⚡ STATUS\n' + reply);
+        }
+
+        // HELP: "help" or "?"
+        else if (lower === 'help' || lower === '?') {
+          await sendTelegram(botToken, chatId,
+            '🍉 *TARBOOZ BOT COMMANDS*\n\n' +
+            '*task:* Buy milk → logs a task\n' +
+            '*note:* Meeting went well → saves a note\n' +
+            '*remember:* I hate mornings → logs to memory\n' +
+            '*remind:* Call dad tomorrow 5pm → sets reminder\n' +
+            '*status* → quick AI briefing\n' +
+            '\nOr just chat — I\'ll respond as Tarbooz.'
+          );
+        }
+
+        // DEFAULT: just chat with Tarbooz
+        else {
+          const memories = await sbGet('memories').catch(()=>[]);
+          const memCtx = memories.length ? '\n\nWhat you remember about the user:\n' + memories.slice(0,10).map(m => `- [${m.tag}] ${m.content}`).join('\n') : '';
+          const reply = await groq(
+            [{ role: 'user', content: text }],
+            'You are Tarbooz, a sharp witty personal AI. Keep Telegram responses concise — max 3 sentences. Be direct and useful.' + memCtx,
+            512, 0.8
+          );
+          await sendTelegram(botToken, chatId, reply);
+          // Auto extract memory
+          try {
+            const raw = await groq(
+              [{ role: 'user', content: `User: "${text}"\nAI: "${reply}"\nExtract facts:` }],
+              'Extract memorable facts about the user. Return ONLY JSON array: [{"content":"fact","tag":"preference"}]. Max 2. If nothing return [].',
+              128, 0.1
+            );
+            const facts = JSON.parse(raw.trim());
+            for (const fact of facts) {
+              await sbInsert('memories', { id: require('crypto').randomUUID(), content: fact.content, tag: fact.tag || 'telegram', created_at: new Date().toISOString() });
+            }
+          } catch {}
+        }
+      } catch(err) {
+        console.error('[Telegram]', err.message);
+        await sendTelegram(botToken, chatId, '// ERROR: ' + err.message);
+      }
+
+      return res.json({ ok: true });
+    }
+
+    // ── Telegram Send Helper (internal) ──
+    if (url === '/telegram/send') {
+      const { text: msgText } = req.body;
+      const botToken = process.env.TELEGRAM_BOT_TOKEN;
+      const chatId = process.env.TELEGRAM_CHAT_ID;
+      await sendTelegram(botToken, chatId, msgText);
+      return res.json({ ok: true });
     }
 
     return res.status(404).json({ error: 'Not found' });
