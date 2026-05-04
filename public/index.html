@@ -981,6 +981,27 @@ function refreshDashboard(){
   loadMemory();
 }
 
+// DISCORD
+async function sendToDiscord(btn, customText) {
+  const text = customText || btn?.getAttribute('data-msg') || '';
+  if (!text) return;
+  const original = btn ? btn.textContent : '';
+  if (btn) { btn.textContent = '// SENDING...'; btn.style.color = 'var(--amber)'; }
+  try {
+    const r = await apiFetch('/api/discord/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text })
+    });
+    if (r.ok) {
+      if (btn) { btn.textContent = '// SENT'; btn.style.color = 'var(--green)'; }
+      setTimeout(() => { if (btn) { btn.textContent = original; btn.style.color = 'var(--muted)'; } }, 2000);
+    } else throw new Error();
+  } catch {
+    if (btn) { btn.textContent = '// FAILED'; btn.style.color = 'var(--red)'; }
+    setTimeout(() => { if (btn) { btn.textContent = original; btn.style.color = 'var(--muted)'; } }, 2000);
+  }
+}
 // UTILS
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function fmt(t){return esc(t).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\*(.+?)\*/g,'<em>$1</em>').replace(/`(.+?)`/g,'<code style="font-family:var(--font);background:rgba(0,255,65,0.1);padding:1px 5px;font-size:12px;color:var(--green)">$1</code>').replace(/\n/g,'<br>');}
