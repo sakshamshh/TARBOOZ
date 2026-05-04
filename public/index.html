@@ -864,6 +864,17 @@ async function sendMessage(){
       appendMsg('ai',reply);
       speak(reply);
       autoExtractMemory(text, reply);
+      // Auto-push to Telegram if user asked for it
+      if (/send.*(telegram|tg)|push.*(telegram|tg)|telegram.*send/i.test(text)) {
+        sendToTelegram(null, reply).then(() => {
+          const msgs = document.getElementById('chatMessages');
+          const d = document.createElement('div');
+          d.style.cssText = 'font-size:10px;color:var(--green-dim);padding:2px 0 6px 38px;letter-spacing:.05em';
+          d.textContent = '// PUSHED TO TELEGRAM';
+          msgs.appendChild(d);
+          msgs.scrollTop = msgs.scrollHeight;
+        }).catch(() => {});
+      }
     }
   }catch(e){removeTyping(tid);appendMsg('ai','Error: '+e.message);console.error('Chat error:',e);}
   document.getElementById('sendBtn').disabled=false;
