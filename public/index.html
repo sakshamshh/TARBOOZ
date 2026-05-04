@@ -1007,6 +1007,47 @@ function refreshDashboard(){
   loadMemory();
 }
 
+// ── SEND TO TELEGRAM ──
+async function sendToTelegram(btn, customText) {
+  const text = customText || btn?.getAttribute('data-text') || '';
+  if (!text) return;
+  const original = btn ? btn.textContent : '';
+  if (btn) { btn.textContent = '// SENDING...'; btn.style.color = 'var(--amber)'; }
+  try {
+    const r = await fetch(API + '/api/telegram/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: '📱 From Tarbooz:\n\n' + text })
+    });
+    if (r.ok) {
+      if (btn) { btn.textContent = '// SENT ✓'; btn.style.color = 'var(--green)'; }
+      setTimeout(() => { if (btn) { btn.textContent = original; btn.style.color = 'var(--muted)'; } }, 2000);
+    } else throw new Error();
+  } catch {
+    if (btn) { btn.textContent = '// FAILED'; btn.style.color = 'var(--red)'; }
+    setTimeout(() => { if (btn) { btn.textContent = original; btn.style.color = 'var(--muted)'; } }, 2000);
+  }
+}
+
+// Also intercept messages that say "send to telegram" or "push to telegram"
+const _origSend = sendMessage;
+async function sendMessage() {
+  const input = document.getElementById('chatInput');
+  const text = input.value.trim().toLowerCase();
+  if (text.includes('send to telegram') || text.includes('push to telegram') || text.includes('send this to telegram')) {
+    // Find last AI message and send it
+    const bubbles = document.querySelectorAll('.msg-bubble.ai');
+    if (bubbles.length > 0) {
+      const lastMsg = bubbles[bubbles.length - 1].textContent;
+      await sendToTelegram(null, lastMsg);
+      appendMsg('ai', '// LAST RESPONSE PUSHED TO YOUR TELEGRAM.');
+      input.value = ''; input.style.height = 'auto';
+      return;
+    }
+  }
+  return _origSend();
+}
+
 // ── UTILS ──
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function fmt(t){return esc(t).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\*(.+?)\*/g,'<em>$1</em>').replace(/`(.+?)`/g,'<code style="font-family:var(--mono);background:rgba(255,255,255,.12);padding:1px 5px;border-radius:4px;font-size:13px">$1</code>').replace(/\n/g,'<br>');}
