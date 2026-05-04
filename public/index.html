@@ -688,6 +688,7 @@ function bootTick(){
   setTimeout(bootTick,220);
 }
 setTimeout(bootTick,300);
+setTimeout(()=>{const bs=document.getElementById('bootScreen');if(bs){bs.style.transition='opacity .4s';bs.style.opacity='0';setTimeout(()=>{bs.style.display='none';},400);}},2500);
 
 // CLOCK
 function tick(){
