@@ -3,306 +3,54 @@ const { v4: uuidv4 } = require('uuid');
 
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL = 'llama-3.3-70b-versatile';
+const WMO = {0:'Clear sky',1:'Mainly clear',2:'Partly cloudy',3:'Overcast',45:'Fog',48:'Icy fog',51:'Light drizzle',53:'Drizzle',55:'Heavy drizzle',61:'Light rain',63:'Rain',65:'Heavy rain',71:'Light snow',73:'Snow',75:'Heavy snow',80:'Showers',81:'Showers',82:'Heavy showers',95:'Thunderstorm',96:'Thunderstorm with hail',99:'Thunderstorm with heavy hail'};
 
-// ── Supabase ──
-function sbHeaders() {
-  return {
-    'apikey': process.env.SUPABASE_ANON_KEY,
-    'Authorization': `Bearer ${process.env.SUPABASE_ANON_KEY}`,
-    'Content-Type': 'application/json',
-    'Prefer': 'return=representation'
-  };
-}
-async function sbGet(table) {
-  const r = await axios.get(`${process.env.SUPABASE_URL}/rest/v1/${table}?order=created_at.desc`, { headers: sbHeaders() });
-  return r.data;
-}
-async function sbInsert(table, data) {
-  const r = await axios.post(`${process.env.SUPABASE_URL}/rest/v1/${table}`, data, { headers: sbHeaders() });
-  return r.data[0];
-}
-async function sbDelete(table, id) {
-  const filter = id ? `?id=eq.${id}` : `?id=neq.00000000-0000-0000-0000-000000000000`;
-  await axios.delete(`${process.env.SUPABASE_URL}/rest/v1/${table}${filter}`, { headers: sbHeaders() });
-}
-
-// ── Groq ──
-async function groq(messages, system, maxTokens = 1024, temp = 0.7) {
-  const r = await axios.post(GROQ_URL, {
-    model: GROQ_MODEL,
-    messages: [{ role: 'system', content: system }, ...messages],
-    max_tokens: maxTokens,
-    temperature: temp
-  }, { headers: { 'Authorization': `Bearer ${process.env.GROQ_API_KEY}`, 'Content-Type': 'application/json' } });
-  return r.data.choices[0].message.content;
-}
-
-// ── WMO Weather codes ──
-const WMO = {0:'Clear sky',1:'Mainly clear',2:'Partly cloudy',3:'Overcast',45:'Fog',51:'Light drizzle',61:'Light rain',63:'Rain',65:'Heavy rain',71:'Light snow',80:'Showers',95:'Thunderstorm'};
-
-async function sendTelegram(token, chatId, text) {
-  await axios.post(`https://api.telegram.org/bot${token}/sendMessage`, {
-    chat_id: chatId,
-    text,
-    parse_mode: 'Markdown'
-  });
-}
+function sbHeaders(){return{'apikey':process.env.SUPABASE_ANON_KEY,'Authorization':`Bearer ${process.env.SUPABASE_ANON_KEY}`,'Content-Type':'application/json','Prefer':'return=representation'};}
+async function sbGet(t){const r=await axios.get(`${process.env.SUPABASE_URL}/rest/v1/${t}?order=created_at.desc`,{headers:sbHeaders()});return r.data;}
+async function sbInsert(t,d){const r=await axios.post(`${process.env.SUPABASE_URL}/rest/v1/${t}`,d,{headers:sbHeaders()});return r.data[0];}
+async function sbDelete(t,id){await axios.delete(`${process.env.SUPABASE_URL}/rest/v1/${t}${id?`?id=eq.${id}`:'?id=neq.00000000-0000-0000-0000-000000000000'}`,{headers:sbHeaders()});}
+async function sbPatch(t,id,d){const r=await axios.patch(`${process.env.SUPABASE_URL}/rest/v1/${t}?id=eq.${id}`,d,{headers:{...sbHeaders(),'Prefer':'return=representation'}});return r.data[0];}
+async function groq(messages,system,maxTokens=1024,temp=0.7){const r=await axios.post(GROQ_URL,{model:GROQ_MODEL,messages:[{role:'system',content:system},...messages],max_tokens:maxTokens,temperature:temp},{headers:{'Authorization':`Bearer ${process.env.GROQ_API_KEY}`,'Content-Type':'application/json'}});return r.data.choices[0].message.content;}
+async function sendTelegram(token,chatId,text){await axios.post(`https://api.telegram.org/bot${token}/sendMessage`,{chat_id:chatId,text,parse_mode:'Markdown'});}
 
 module.exports = async (req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,DELETE,OPTIONS,PATCH');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
-  if (req.method === 'OPTIONS') return res.status(200).end();
+  res.setHeader('Access-Control-Allow-Origin','*');
+  res.setHeader('Access-Control-Allow-Methods','GET,POST,DELETE,OPTIONS,PATCH');
+  res.setHeader('Access-Control-Allow-Headers','Content-Type,Authorization');
+  if(req.method==='OPTIONS')return res.status(200).end();
+  const url=req.url.split('?')[0].replace(/^\/api/,'');
+  const query=req.query;
+  try{
 
-  const url = req.url.split('?')[0].replace(/^\/api/, '');
-console.log('URL:', req.url, '→', url);
-  const query = req.query;
+    if(url==='/health'||url==='')return res.json({status:'ok',version:'2.0.0',timestamp:new Date().toISOString()});
 
-  try {
+    if(url==='/ai/chat'){const{messages,systemPrompt}=req.body;const text=await groq(messages,systemPrompt||'You are Tarbooz, a sharp witty personal AI.');return res.json({content:[{text}]});}
 
-    // ── Health ──
-    if (url === '/health' || url === '') {
-      return res.json({ status: 'ok', version: '2.0.0', timestamp: new Date().toISOString() });
-    }
+    if(url==='/ai/extract-memory'){const{userMessage,aiResponse}=req.body;const raw=await groq([{role:'user',content:`User: "${userMessage}"\nAI: "${aiResponse}"\nExtract facts:`}],'Extract memorable facts about the user. Return ONLY JSON array: [{"content":"fact","tag":"preference"}]. Tags: preference,fact,goal,work,personal,habit. Max 3. If nothing return []. Raw JSON only.',256,0.1);try{return res.json({facts:JSON.parse(raw)});}catch{return res.json({facts:[]});}}
 
-    // ── AI Chat ──
-    if (url === '/ai/chat') {
-      const { messages, systemPrompt } = req.body;
-      const text = await groq(messages, systemPrompt || 'You are Tarbooz, a sharp witty personal AI.');
-      return res.json({ content: [{ text }] });
-    }
+    if(url==='/ai/should-search'){const{message}=req.body;const raw=await groq([{role:'user',content:message}],'Decide if this needs a web search. Reply ONLY with {"search":true,"query":"search query"} or {"search":false}.',64,0.1);try{return res.json(JSON.parse(raw));}catch{return res.json({search:false});}}
 
-    // ── AI Extract Memory ──
-    if (url === '/ai/extract-memory') {
-      const { userMessage, aiResponse } = req.body;
-      const raw = await groq(
-        [{ role: 'user', content: `User: "${userMessage}"\nAI: "${aiResponse}"\nExtract facts:` }],
-        'Extract memorable facts about the user. Return ONLY a JSON array: [{"content":"fact","tag":"preference"}]. Tags: preference,fact,goal,work,personal,habit. Max 3. If nothing return []. Raw JSON only.',
-        256, 0.1
-      );
-      try { return res.json({ facts: JSON.parse(raw) }); } catch { return res.json({ facts: [] }); }
-    }
+    if(url==='/weather'){const city=query.city||'Amritsar';const geo=await axios.get('https://geocoding-api.open-meteo.com/v1/search',{params:{name:city,count:1,language:'en',format:'json'}});const g=geo.data.results?.[0];if(!g)return res.status(404).json({error:'City not found'});const w=await axios.get('https://api.open-meteo.com/v1/forecast',{params:{latitude:g.latitude,longitude:g.longitude,current:'temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m',daily:'sunrise,sunset',timezone:'auto',forecast_days:1}});const c=w.data.current,d=w.data.daily;return res.json({city:g.name,country:g.country,temp:Math.round(c.temperature_2m),feels_like:Math.round(c.apparent_temperature),condition:WMO[c.weather_code]||'Unknown',humidity:c.relative_humidity_2m,wind_kph:Math.round(c.wind_speed_10m),sunrise:new Date(d.sunrise[0]).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),sunset:new Date(d.sunset[0]).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})});}
 
-    // ── AI Should Search ──
-    if (url === '/ai/should-search') {
-      const { message } = req.body;
-      const raw = await groq(
-        [{ role: 'user', content: message }],
-        'Decide if this needs a web search. Reply ONLY with {"search":true,"query":"search query"} or {"search":false}. Search for current events, news, prices, sports. Do NOT search for coding, math, opinions.',
-        64, 0.1
-      );
-      try { return res.json(JSON.parse(raw)); } catch { return res.json({ search: false }); }
-    }
+    if(url==='/search'){const q=query.q;if(!q)return res.status(400).json({error:'q required'});const r=await axios.post('https://api.tavily.com/search',{api_key:process.env.TAVILY_API_KEY,query:q,search_depth:'basic',max_results:5,include_answer:true});return res.json({query:q,answer:r.data.answer||null,results:(r.data.results||[]).map(x=>({title:x.title,url:x.url,snippet:x.content?.slice(0,200)}))});}
 
-    // ── Weather ──
-    if (url === '/weather') {
-      const city = query.city || 'Amritsar';
-      const geo = await axios.get('https://geocoding-api.open-meteo.com/v1/search', { params: { name: city, count: 1, language: 'en', format: 'json' } });
-      const g = geo.data.results?.[0];
-      if (!g) return res.status(404).json({ error: 'City not found' });
-      const w = await axios.get('https://api.open-meteo.com/v1/forecast', { params: { latitude: g.latitude, longitude: g.longitude, current: 'temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m', daily: 'sunrise,sunset', timezone: 'auto', forecast_days: 1 } });
-      const c = w.data.current, d = w.data.daily;
-      return res.json({ city: g.name, country: g.country, temp: Math.round(c.temperature_2m), feels_like: Math.round(c.apparent_temperature), condition: WMO[c.weather_code] || 'Unknown', humidity: c.relative_humidity_2m, wind_kph: Math.round(c.wind_speed_10m), sunrise: new Date(d.sunrise[0]).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), sunset: new Date(d.sunset[0]).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) });
-    }
+    if(url==='/memory/context'){const memories=await sbGet('memories');if(!memories.length)return res.json({context:''});return res.json({context:'## What you remember about the user:\n'+memories.map(m=>`- [${m.tag}] ${m.content}`).join('\n')});}
 
-    // ── Search ──
-    if (url === '/search') {
-      const q = query.q;
-      if (!q) return res.status(400).json({ error: 'q required' });
-      const r = await axios.post('https://api.tavily.com/search', { api_key: process.env.TAVILY_API_KEY, query: q, search_depth: 'basic', max_results: 5, include_answer: true });
-      return res.json({ query: q, answer: r.data.answer || null, results: (r.data.results || []).map(x => ({ title: x.title, url: x.url, snippet: x.content?.slice(0, 200) })) });
-    }
+    if(url.startsWith('/memory')){const idMatch=url.match(/\/memory\/([a-f0-9-]{36})/);if(req.method==='GET')return res.json(await sbGet('memories'));if(req.method==='POST'){const{content,tag}=req.body;if(!content)return res.status(400).json({error:'content required'});const entry=await sbInsert('memories',{id:uuidv4(),content,tag:tag||'general',created_at:new Date().toISOString()});return res.json(entry);}if(req.method==='DELETE'){await sbDelete('memories',idMatch?.[1]||null);return res.json({success:true});}}
 
-    // ── Memory ──
-    if (url === '/memory/context') {
-      const memories = await sbGet('memories');
-      if (!memories.length) return res.json({ context: '' });
-      return res.json({ context: '## What you remember about the user:\n' + memories.map(m => `- [${m.tag}] ${m.content}`).join('\n') });
-    }
+    if(url.startsWith('/reminders')){const idMatch=url.match(/\/reminders\/([a-f0-9-]{36})/);const doneMatch=url.match(/\/reminders\/([a-f0-9-]{36})\/done/);if(req.method==='GET'){const reminders=await sbGet('reminders').catch(()=>[]);const now=new Date();return res.json(reminders.map(r=>({...r,overdue:!r.done&&new Date(r.datetime)<now})));}if(req.method==='POST'){const{title,datetime,notes}=req.body;if(!title||!datetime)return res.status(400).json({error:'title and datetime required'});const entry=await sbInsert('reminders',{id:uuidv4(),title,datetime,notes:notes||'',done:false,created_at:new Date().toISOString()});return res.json(entry);}if(req.method==='PATCH'&&doneMatch){const id=doneMatch[1];const reminders=await sbGet('reminders');const r=reminders.find(r=>r.id===id);if(!r)return res.status(404).json({error:'Not found'});const updated=await sbPatch('reminders',id,{done:!r.done});return res.json(updated||{success:true});}if(req.method==='DELETE'&&idMatch){await sbDelete('reminders',idMatch[1]);return res.json({success:true});}}
 
-    if (url.startsWith('/memory')) {
-      const idMatch = url.match(/\/memory\/([a-f0-9-]{36})/);
-      if (req.method === 'GET') {
-        return res.json(await sbGet('memories'));
-      }
-      if (req.method === 'POST') {
-        const { content, tag } = req.body;
-        if (!content) return res.status(400).json({ error: 'content required' });
-        const entry = await sbInsert('memories', { id: uuidv4(), content, tag: tag || 'general', created_at: new Date().toISOString() });
-        return res.json(entry);
-      }
-      if (req.method === 'DELETE') {
-        await sbDelete('memories', idMatch?.[1] || null);
-        return res.json({ success: true });
-      }
-    }
+    if(url==='/auth/login'){const redirect='https://tarbooz.vercel.app/auth/callback';const scope=encodeURIComponent('https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events');return res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?client_id=${process.env.GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirect)}&response_type=code&scope=${scope}&access_type=offline&prompt=consent`);}
+    if(url==='/auth/callback'){const{code}=query;const r=await axios.post('https://oauth2.googleapis.com/token',{code,client_id:process.env.GOOGLE_CLIENT_ID,client_secret:process.env.GOOGLE_CLIENT_SECRET,redirect_uri:'https://tarbooz.vercel.app/auth/callback',grant_type:'authorization_code'});const{access_token,refresh_token,expires_in}=r.data;return res.redirect(`/?cal_token=${access_token}&cal_refresh=${refresh_token}&cal_expires=${Date.now()+expires_in*1000}`);}
 
-    // ── Auth ──
-    if (url === '/auth/login') {
-      const redirect = 'https://tarbooz.vercel.app/auth/callback';
-      const scope = encodeURIComponent('https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events');
-      return res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?client_id=${process.env.GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirect)}&response_type=code&scope=${scope}&access_type=offline&prompt=consent`);
-    }
+    if(url==='/calendar/events'){const token=req.headers.authorization?.replace('Bearer ','');if(!token)return res.status(401).json({error:'No token'});const now=new Date().toISOString();const future=new Date(Date.now()+7*24*60*60*1000).toISOString();const r=await axios.get('https://www.googleapis.com/calendar/v3/calendars/primary/events',{headers:{Authorization:`Bearer ${token}`},params:{timeMin:now,timeMax:future,singleEvents:true,orderBy:'startTime',maxResults:10}});return res.json({events:(r.data.items||[]).map(e=>({id:e.id,title:e.summary||'Untitled',start:e.start?.dateTime||e.start?.date,end:e.end?.dateTime||e.end?.date,location:e.location||null,allDay:!e.start?.dateTime}))});}
+    if(url==='/calendar/create'){const token=req.headers.authorization?.replace('Bearer ','');if(!token)return res.status(401).json({error:'No token'});const{title,start,end,description,location}=req.body;const r=await axios.post('https://www.googleapis.com/calendar/v3/calendars/primary/events',{summary:title,start:{dateTime:start},end:{dateTime:end||start},description,location},{headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'}});return res.json({event:r.data});}
 
-    if (url === '/auth/callback') {
-      const { code } = query;
-      const r = await axios.post('https://oauth2.googleapis.com/token', { code, client_id: process.env.GOOGLE_CLIENT_ID, client_secret: process.env.GOOGLE_CLIENT_SECRET, redirect_uri: 'https://tarbooz.vercel.app/auth/callback', grant_type: 'authorization_code' });
-      const { access_token, refresh_token, expires_in } = r.data;
-      return res.redirect(`/?cal_token=${access_token}&cal_refresh=${refresh_token}&cal_expires=${Date.now() + expires_in * 1000}`);
-    }
+    if(url==='/telegram/webhook'){if(req.method!=='POST')return res.status(405).json({error:'Method not allowed'});const{message}=req.body;if(!message)return res.json({ok:true});const chatId=message.chat.id.toString();const allowedChatId=process.env.TELEGRAM_CHAT_ID;const botToken=process.env.TELEGRAM_BOT_TOKEN;if(chatId!==allowedChatId){await sendTelegram(botToken,chatId,'Unauthorized.');return res.json({ok:true});}const text=message.text||'';const lower=text.toLowerCase().trim();try{if(lower.startsWith('task:')||lower.startsWith('todo:')||lower.startsWith('t:')){const content=text.split(':').slice(1).join(':').trim();await sbInsert('reminders',{id:uuidv4(),title:content,datetime:new Date(Date.now()+86400000).toISOString(),notes:'From Telegram',done:false,created_at:new Date().toISOString()}).catch(()=>{});const reply=await groq([{role:'user',content:`Task added: "${content}". Confirm in one punchy sentence.`}],'You are Tarbooz. Be brief and edgy.',128,0.8);await sendTelegram(botToken,chatId,'✅ TASK LOGGED\n'+reply);}else if(lower.startsWith('remember:')||lower.startsWith('mem:')||lower.startsWith('log:')){const content=text.split(':').slice(1).join(':').trim();await sbInsert('memories',{id:uuidv4(),content,tag:'telegram',created_at:new Date().toISOString()});await sendTelegram(botToken,chatId,'🧠 LOGGED TO MEMORY\n"'+content+'"');}else if(lower.startsWith('remind:')||lower.startsWith('r:')){const content=text.split(':').slice(1).join(':').trim();const parsed=await groq([{role:'user',content:`Parse reminder: "${content}". Today: ${new Date().toISOString()}. Reply ONLY with JSON: {"title":"...","datetime":"ISO string"}`}],'You are a datetime parser. Reply only with valid JSON.',128,0.1);try{const{title,datetime}=JSON.parse(parsed.trim());await sbInsert('reminders',{id:uuidv4(),title,datetime,notes:'From Telegram',done:false,created_at:new Date().toISOString()});const dt=new Date(datetime).toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});await sendTelegram(botToken,chatId,'⏰ REMINDER SET\n'+title+' @ '+dt);}catch{await sendTelegram(botToken,chatId,'⏰ REMINDER LOGGED\n"'+content+'"');}}else if(lower==='help'||lower==='?'){await sendTelegram(botToken,chatId,'🍉 *TARBOOZ COMMANDS*\n\n*task:* Buy milk\n*remember:* I hate mornings\n*remind:* Call dad tomorrow 5pm\n*status* → AI briefing\n\nOr just chat freely.');}else if(lower==='status'||lower==='sup'){const memories=await sbGet('memories').catch(()=>[]);const reply=await groq([{role:'user',content:'Give me a quick status briefing.'}],'You are Tarbooz. '+(memories.length?'User info:\n'+memories.slice(0,5).map(m=>'- '+m.content).join('\n'):'')+'\nBe brief, edgy, max 3 sentences.',256,0.8);await sendTelegram(botToken,chatId,'⚡ STATUS\n'+reply);}else{const memories=await sbGet('memories').catch(()=>[]);const memCtx=memories.length?'\n\nWhat you remember:\n'+memories.slice(0,10).map(m=>`- [${m.tag}] ${m.content}`).join('\n'):'';const reply=await groq([{role:'user',content:text}],'You are Tarbooz, a sharp witty AI. Keep Telegram responses under 3 sentences.'+memCtx,512,0.8);await sendTelegram(botToken,chatId,reply);try{const raw=await groq([{role:'user',content:`User: "${text}"\nAI: "${reply}"\nExtract facts:`}],'Extract memorable user facts. Return ONLY JSON array: [{"content":"fact","tag":"preference"}]. Max 2. If nothing return [].',128,0.1);const facts=JSON.parse(raw.trim());for(const fact of facts)await sbInsert('memories',{id:uuidv4(),content:fact.content,tag:fact.tag||'telegram',created_at:new Date().toISOString()});}catch{}}}catch(err){console.error('[Telegram]',err.message);await sendTelegram(botToken,chatId,'// ERROR: '+err.message);}return res.json({ok:true});}
 
-    // ── Calendar ──
-    if (url === '/calendar/events') {
-      const token = req.headers.authorization?.replace('Bearer ', '');
-      if (!token) return res.status(401).json({ error: 'No token' });
-      const now = new Date().toISOString();
-      const future = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-      const r = await axios.get('https://www.googleapis.com/calendar/v3/calendars/primary/events', { headers: { Authorization: `Bearer ${token}` }, params: { timeMin: now, timeMax: future, singleEvents: true, orderBy: 'startTime', maxResults: 10 } });
-      return res.json({ events: (r.data.items || []).map(e => ({ id: e.id, title: e.summary || 'Untitled', start: e.start?.dateTime || e.start?.date, end: e.end?.dateTime || e.end?.date, location: e.location || null, allDay: !e.start?.dateTime })) });
-    }
+    if(url==='/telegram/send'){const{text:msgText}=req.body;const botToken=process.env.TELEGRAM_BOT_TOKEN;const chatId=process.env.TELEGRAM_CHAT_ID;if(!botToken||!chatId)return res.status(500).json({error:'Telegram not configured'});await sendTelegram(botToken,chatId,msgText);return res.json({ok:true});}
 
-    if (url === '/calendar/create') {
-      const token = req.headers.authorization?.replace('Bearer ', '');
-      if (!token) return res.status(401).json({ error: 'No token' });
-      const { title, start, end, description, location } = req.body;
-      const r = await axios.post('https://www.googleapis.com/calendar/v3/calendars/primary/events', { summary: title, start: { dateTime: start }, end: { dateTime: end || start }, description, location }, { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } });
-      return res.json({ event: r.data });
-    }
+    return res.status(404).json({error:'Not found: '+url});
 
-    // ── Telegram Webhook ──
-    if (url === '/telegram/webhook') {
-      if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-      const { message } = req.body;
-      if (!message) return res.json({ ok: true });
-
-      const chatId = message.chat.id.toString();
-      const allowedChatId = process.env.TELEGRAM_CHAT_ID;
-      const botToken = process.env.TELEGRAM_BOT_TOKEN;
-
-      // Only respond to authorized user
-      if (chatId !== allowedChatId) {
-        await sendTelegram(botToken, chatId, '⛔ Unauthorized.');
-        return res.json({ ok: true });
-      }
-
-      const text = message.text || '';
-      const lower = text.toLowerCase().trim();
-
-      try {
-        // TASK: "task: buy groceries" or "todo: call mom"
-        if (lower.startsWith('task:') || lower.startsWith('todo:') || lower.startsWith('t:')) {
-          const content = text.split(':').slice(1).join(':').trim();
-          await sbInsert('tasks_tg', { id: require('crypto').randomUUID(), content, done: false, created_at: new Date().toISOString() }).catch(()=>{});
-          // Also call reminders API if available
-          const reply = await groq(
-            [{ role: 'user', content: `The user wants to add this task: "${content}". Confirm it's added in one short punchy sentence. Be Tarbooz — edgy, real, no fluff.` }],
-            'You are Tarbooz, a sharp AI assistant. Keep responses under 2 sentences.',
-            128, 0.8
-          );
-          await sendTelegram(botToken, chatId, '✅ TASK LOGGED\n' + reply);
-        }
-
-        // NOTE: "note: meeting was great"
-        else if (lower.startsWith('note:') || lower.startsWith('n:')) {
-          const content = text.split(':').slice(1).join(':').trim();
-          await sbInsert('notes_tg', { id: require('crypto').randomUUID(), title: content.slice(0,50), body: content, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }).catch(()=>{});
-          await sendTelegram(botToken, chatId, '📝 NOTE SAVED\n"' + content.slice(0,100) + '"');
-        }
-
-        // MEMORY: "remember: I prefer dark mode"
-        else if (lower.startsWith('remember:') || lower.startsWith('mem:') || lower.startsWith('log:')) {
-          const content = text.split(':').slice(1).join(':').trim();
-          await sbInsert('memories', { id: require('crypto').randomUUID(), content, tag: 'telegram', created_at: new Date().toISOString() });
-          await sendTelegram(botToken, chatId, '🧠 LOGGED TO MEMORY\n"' + content + '"');
-        }
-
-        // REMIND: "remind: dentist tomorrow at 3pm"
-        else if (lower.startsWith('remind:') || lower.startsWith('r:')) {
-          const content = text.split(':').slice(1).join(':').trim();
-          // Use AI to parse the time
-          const parsed = await groq(
-            [{ role: 'user', content: `Parse this reminder and extract title and datetime. Today is ${new Date().toISOString()}. Reminder: "${content}". Reply ONLY with JSON: {"title": "...", "datetime": "ISO string"}` }],
-            'You are a datetime parser. Reply only with valid JSON.',
-            128, 0.1
-          );
-          try {
-            const { title, datetime } = JSON.parse(parsed.trim());
-            await sbInsert('reminders_tg', { id: require('crypto').randomUUID(), title, datetime, notes: '', done: false, created_at: new Date().toISOString() }).catch(()=>{});
-            const dt = new Date(datetime).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-            await sendTelegram(botToken, chatId, '⏰ REMINDER SET\n' + title + ' @ ' + dt);
-          } catch {
-            await sendTelegram(botToken, chatId, '⏰ REMINDER LOGGED\n"' + content + '"');
-          }
-        }
-
-        // STATUS: "status" — show quick summary
-        else if (lower === 'status' || lower === 'sup' || lower === 'hey') {
-          const memories = await sbGet('memories').catch(()=>[]);
-          const reply = await groq(
-            [{ role: 'user', content: 'Give me a quick status update. What should I focus on?' }],
-            'You are Tarbooz. ' + (memories.length ? 'What you know about the user:\n' + memories.slice(0,5).map(m => '- ' + m.content).join('\n') : '') + '\nBe brief, edgy, useful. Max 3 sentences.',
-            256, 0.8
-          );
-          await sendTelegram(botToken, chatId, '⚡ STATUS\n' + reply);
-        }
-
-        // HELP: "help" or "?"
-        else if (lower === 'help' || lower === '?') {
-          await sendTelegram(botToken, chatId,
-            '🍉 *TARBOOZ BOT COMMANDS*\n\n' +
-            '*task:* Buy milk → logs a task\n' +
-            '*note:* Meeting went well → saves a note\n' +
-            '*remember:* I hate mornings → logs to memory\n' +
-            '*remind:* Call dad tomorrow 5pm → sets reminder\n' +
-            '*status* → quick AI briefing\n' +
-            '\nOr just chat — I\'ll respond as Tarbooz.'
-          );
-        }
-
-        // DEFAULT: just chat with Tarbooz
-        else {
-          const memories = await sbGet('memories').catch(()=>[]);
-          const memCtx = memories.length ? '\n\nWhat you remember about the user:\n' + memories.slice(0,10).map(m => `- [${m.tag}] ${m.content}`).join('\n') : '';
-          const reply = await groq(
-            [{ role: 'user', content: text }],
-            'You are Tarbooz, a sharp witty personal AI. Keep Telegram responses concise — max 3 sentences. Be direct and useful.' + memCtx,
-            512, 0.8
-          );
-          await sendTelegram(botToken, chatId, reply);
-          // Auto extract memory
-          try {
-            const raw = await groq(
-              [{ role: 'user', content: `User: "${text}"\nAI: "${reply}"\nExtract facts:` }],
-              'Extract memorable facts about the user. Return ONLY JSON array: [{"content":"fact","tag":"preference"}]. Max 2. If nothing return [].',
-              128, 0.1
-            );
-            const facts = JSON.parse(raw.trim());
-            for (const fact of facts) {
-              await sbInsert('memories', { id: require('crypto').randomUUID(), content: fact.content, tag: fact.tag || 'telegram', created_at: new Date().toISOString() });
-            }
-          } catch {}
-        }
-      } catch(err) {
-        console.error('[Telegram]', err.message);
-        await sendTelegram(botToken, chatId, '// ERROR: ' + err.message);
-      }
-
-      return res.json({ ok: true });
-    }
-
-    // ── Telegram Send Helper (internal) ──
-    if (url === '/telegram/send') {
-      const { text: msgText } = req.body;
-      const botToken = process.env.TELEGRAM_BOT_TOKEN;
-      const chatId = process.env.TELEGRAM_CHAT_ID;
-      await sendTelegram(botToken, chatId, msgText);
-      return res.json({ ok: true });
-    }
-
-    return res.status(404).json({ error: 'Not found' });
-
-  } catch(err) {
-    console.error('[API]', url, err.message);
-    res.status(err.response?.status || 500).json({ error: err.response?.data?.error?.message || err.message });
-  }
+  }catch(err){console.error('[API]',url,err.message);res.status(err.response?.status||500).json({error:err.response?.data?.error?.message||err.message});}
 };
