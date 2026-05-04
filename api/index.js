@@ -47,6 +47,7 @@ module.exports = async (req, res) => {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   const url = req.url.split('?')[0].replace(/^\/api/, '');
+console.log('URL:', req.url, '→', url);
   const query = req.query;
 
   try {
