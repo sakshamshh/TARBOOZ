@@ -255,16 +255,7 @@ select.input option{background:#000;color:var(--green)}
 ::-webkit-scrollbar-thumb{background:var(--border2)}
 ::-webkit-scrollbar-thumb:hover{background:var(--green-dim)}
 
-/* BOOT SEQUENCE */
-.boot-screen{position:fixed;inset:0;background:#000;z-index:10000;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:var(--font)}
-.boot-logo{font-family:var(--font-display);font-size:48px;font-weight:900;color:var(--green);text-shadow:var(--glow-strong);letter-spacing:8px;margin-bottom:20px;animation:glitch 2s infinite}
-@keyframes glitch{0%,90%,100%{text-shadow:var(--glow-strong)}91%{text-shadow:-2px 0 red,2px 0 cyan,var(--glow-strong)}93%{text-shadow:2px 0 red,-2px 0 cyan,var(--glow-strong)}}
-.boot-lines{width:400px;text-align:left}
-.boot-line{font-size:11px;color:var(--green-dim);margin:3px 0;opacity:0;animation:bootLine .1s forwards}
-.boot-bar{width:400px;height:2px;background:var(--surface3);margin-top:20px}
-.boot-fill{height:100%;background:var(--green);box-shadow:var(--glow);animation:bootProgress 2s ease forwards}
-@keyframes bootLine{to{opacity:1}}
-@keyframes bootProgress{from{width:0}to{width:100%}}
+to{width:100%}}
 
 @media(max-width:760px){
   .sidebar{width:48px;padding:8px 4px}
@@ -278,11 +269,7 @@ select.input option{background:#000;color:var(--green)}
 </head>
 <body>
 
-<!-- BOOT SCREEN -->
-<div class="boot-screen" id="bootScreen">
-  <div class="boot-logo">TARBOOZ</div>
-  <div class="boot-lines" id="bootLines"></div>
-  <div class="boot-bar"><div class="boot-fill"></div></div>
+
 </div>
 
 <!-- TOPBAR -->
@@ -666,29 +653,6 @@ function loadSettings(){
   document.getElementById('s-rate-val').textContent=parseFloat(rate).toFixed(1)+'x';
 }
 loadSettings();
-
-// BOOT SEQUENCE
-const bootMessages=['INITIALIZING TARBOOZ CORE...','LOADING NEURAL NETWORK...','CONNECTING TO GROQ API...','SYNCING MEMORY BANKS...','CALIBRATING VOICE MODULE...','ESTABLISHING SECURE LINK...','ALL SYSTEMS NOMINAL.','TARBOOZ ONLINE.'];
-let bootIdx=0;
-function bootTick(){
-  if(bootIdx>=bootMessages.length){
-    setTimeout(()=>{
-      document.getElementById('bootScreen').style.opacity='0';
-      document.getElementById('bootScreen').style.transition='opacity .5s';
-      setTimeout(()=>document.getElementById('bootScreen').style.display='none',500);
-    },400);
-    return;
-  }
-  const line=document.createElement('div');
-  line.className='boot-line';
-  line.style.animationDelay='0s';
-  line.textContent='> '+bootMessages[bootIdx];
-  document.getElementById('bootLines').appendChild(line);
-  bootIdx++;
-  setTimeout(bootTick,220);
-}
-setTimeout(bootTick,300);
-setTimeout(()=>{const bs=document.getElementById('bootScreen');if(bs){bs.style.transition='opacity .4s';bs.style.opacity='0';setTimeout(()=>{bs.style.display='none';},400);}},2500);
 
 // CLOCK
 function tick(){
